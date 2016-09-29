@@ -20,11 +20,19 @@ N/A
 The data_seeder will be a lightweight application that hits the REST API to create new snapshots at given intervals. The list of data to request and the schedule of requests shall be configurable via config file or command line.
 
 # Detailed Design
-data_seeder is a node.js app running inside a temporary container in our cluster. A very basic starting point is the test branch of CTM/api that simply fires off a bunch of POST requests to the API with a wrapper around it to make it run regularly and with smarter logic.
+data_seeder is a node.js app running inside a temporary container in our cluster. A very basic starting point is the test branch of CTM/api that simply fires off a bunch of POST requests. I plan to extend this concept with a larger data set, scheduled task, and containerize it for deployment.
 
-The app will read in a list of sites to archive at runtime from a config file. Node-cron will handle the scheduling.
+data_seeder will direct POST requests at a configurable endpoint with the following format:
+```json
+{ "requestedUrl": "http://google.com/" }
+```
+The endpoint is set via environment variable. In development we will target localhost:3001/api/snapshot.
 
-Major design consideration is throttling/scheduling the requests so the usability of the snapshot queue is never severely impacted by the data_seeder app. In this case, we'll throttle the requests by submitting them in small bunches at regular intervals so by the end of the day we have the full lot.
+The app will read in a list of sites to archive at runtime from a config file. The source data is the top 5760 sites from [Alexa's top one million websites](https://support.alexa.com/hc/en-us/articles/200449834-Does-Alexa-have-a-list-of-its-top-ranked-websites-) in JSON format.
+
+Major design consideration is throttling/scheduling the requests so the usability of the snapshot queue is never severely impacted by the data_seeder app. In this case, we will use node-cron to space the requests out over the entire day. I propose to run a batch of 4 requests each minute throughout the day. This should allow us to snapshot our whole list of 5760 sites and then begin again.
+
+Each request and response will be logged to stdout. Also will have data_seeder check and report queuelength as part of logging.
 
 # Alternatives Considered
 * Scheduling:
@@ -38,5 +46,3 @@ Major design consideration is throttling/scheduling the requests so the usabilit
 N/A
 
 # Open Issues
-* Do we want to log the activities of data_seeder somewhere?
-* Are we doing any authentication on the REST API/Plans for it?
